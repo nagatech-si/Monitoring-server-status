@@ -26,14 +26,18 @@ function AdminLayout() {
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [servers, setServers] = useState<Server[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // const [isRefreshing, setIsRefreshing] = useState(false); // removed unused
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState<'dashboard' | 'group' | 'server' | 'history' | 'report'>('dashboard');
 
   useEffect(() => {
+    // Initial fetch
     loadData();
+    // Set up polling every 5 minutes
+    const interval = setInterval(loadData, 300000); // 300000 ms = 5 minutes
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -128,22 +132,7 @@ function AdminLayout() {
     }
   };
 
-  const handleCheckStatus = async (id: string) => {
-    try {
-      setIsRefreshing(true);
-      const updatedServer = await api.checkServerStatus(id);
-      setServers(prevServers =>
-        prevServers.map(server =>
-          server._id === id ? updatedServer : server
-        )
-      );
-    } catch (err) {
-      setError('Failed to check server status');
-      console.error('Error checking server status:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  // const handleCheckStatus = async (id: string) => { /* removed unused */ };
 
   const handleEditGroup = (group: Group) => {
     setEditingGroup(group);
@@ -170,20 +159,7 @@ function AdminLayout() {
     }
   };
 
-  const handleRefreshAll = async () => {
-    try {
-      setIsRefreshing(true);
-      setError(null);
-      const promises = servers.map(server => api.checkServerStatus(server._id));
-      const updatedServers = await Promise.all(promises);
-      setServers(updatedServers);
-    } catch (err) {
-      setError('Failed to refresh servers');
-      console.error('Error refreshing servers:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  // const handleRefreshAll = async () => { /* removed unused */ };
 
   if (isLoading) {
     return (
@@ -201,8 +177,6 @@ function AdminLayout() {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        onAddGroup={() => setIsGroupModalOpen(true)}
-        onAddServer={() => setIsServerModalOpen(true)}
         activeMenu={activeMenu}
         setActiveMenu={setActiveMenu}
       />

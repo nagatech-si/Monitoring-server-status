@@ -2,19 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { format } from 'date-fns';
 import { CheckCircle, Edit, Trash2 } from 'lucide-react';
-import IncidentModal from '../components/IncidentModal';
+import IncidentModal, { IncidentFormData as BaseIncidentFormData } from '../components/IncidentModal';
+
+type IncidentFormData = BaseIncidentFormData & { _id?: string };
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import SuccessToast from '../components/SuccessToast';
-
-export interface IncidentFormData {
-  _id?: string;
-  startTime: string;
-  endTime: string;
-  cause: string;
-  solution: string;
-  status: 'resolved' | 'ongoing';
-  timelines?: { status: string; time: string; message: string }[];
-}
 
 interface IncidentHistoryProps {
   showAddButton?: boolean;
@@ -28,7 +20,7 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [expandedTimeline, setExpandedTimeline] = useState<string | null>(null);
   const [isModalOpen, setModalOpen] = useState(false);
-  const [editingIncident, setEditingIncident] = useState<IncidentFormData | null>(null);
+  const [editingIncident, setEditingIncident] = useState<IncidentFormData | undefined>(undefined);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [incidentToDelete, setIncidentToDelete] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -51,7 +43,7 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
   // Group incidents by month
   const groupIncidentsByMonth = (incidents: IncidentFormData[]) => {
     const groups: Record<string, IncidentFormData[]> = {};
-    incidents.forEach(incident => {
+  incidents.forEach((incident: IncidentFormData) => {
       const date = new Date(incident.startTime);
       const key = format(date, 'MMMM yyyy');
       if (!groups[key]) groups[key] = [];
@@ -76,7 +68,7 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
       const updatedIncidents = await api.getAllIncidents();
       setIncidents(updatedIncidents);
       setModalOpen(false);
-      setEditingIncident(null);
+      setEditingIncident(undefined);
     } catch (error) {
       console.error('Failed to save incident:', error);
       alert('Gagal menyimpan incident. Silakan coba lagi.');
@@ -112,10 +104,8 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
 
   const handleCloseModal = () => {
     setModalOpen(false);
-    setEditingIncident(null);
-  };
-
-  const grouped = groupIncidentsByMonth(incidents);
+    setEditingIncident(undefined);
+  };  const grouped = groupIncidentsByMonth(incidents);
 
   return (
     <div className="p-0">
@@ -134,7 +124,7 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSubmit={handleSubmitIncident}
-        initialData={editingIncident || undefined}
+        initialData={editingIncident}
       />
 
       <DeleteConfirmationModal
@@ -170,10 +160,30 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
               </button>
               {expandedMonth === month && (
                 <div className="px-4 sm:px-8 pb-6 sm:pb-8 pt-2 space-y-4 sm:space-y-8">
-                  {items.map((incident) => {
+                  {items.map((incident: IncidentFormData & { _id?: string }) => {
                     const timelineCount = Array.isArray(incident.timelines) ? incident.timelines.length : 0;
+                    let resolvedTime = '-';
+                    if (Array.isArray(incident.timelines) && incident.timelines.length > 0) {
+                      const last = incident.timelines[incident.timelines.length - 1];
+                      resolvedTime = last.time ? new Date(last.time).toLocaleString() : '-';
+                    } else if (incident.endTime) {
+                      resolvedTime = new Date(incident.endTime).toLocaleString();
+                    }
+                    let duration = '-';
+                    const start = incident.startTime ? new Date(incident.startTime) : null;
+                    let end: Date | null = null;
+                    if (Array.isArray(incident.timelines) && incident.timelines.length > 0) {
+                      const last = incident.timelines[incident.timelines.length - 1];
+                      end = last.time ? new Date(last.time) : null;
+                    } else if (incident.endTime) {
+                      end = new Date(incident.endTime);
+                    }
+                    if (start && end) {
+                      const diff = Math.round((end.getTime() - start.getTime()) / 60000);
+                      duration = diff > 0 ? diff + ' menit' : '0 menit';
+                    }
                     return (
-                      <div key={incident._id} className="relative flex bg-white rounded-xl border border-gray-200 shadow p-4 sm:p-6">
+                      <div key={incident._id ?? incident.startTime} className="relative flex bg-white rounded-xl border border-gray-200 shadow p-4 sm:p-6">
                         {/* Vertical green line */}
                         <div className="absolute left-0 top-4 sm:top-6 bottom-4 sm:bottom-6 w-1 sm:w-2 rounded-xl bg-green-400" style={{ minHeight: '80%' }} />
                         <div className="pl-3 sm:pl-6 w-full">
@@ -190,40 +200,20 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
                           </div>
                           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-6 text-xs sm:text-sm text-gray-500 mb-3 sm:mb-2">
                             <span>Started: {incident.startTime ? new Date(incident.startTime).toLocaleString() : '-'}</span>
-                            <span>Resolved: {(() => {
-                              if (Array.isArray(incident.timelines) && incident.timelines.length > 0) {
-                                const last = incident.timelines[incident.timelines.length - 1];
-                                return last.time ? new Date(last.time).toLocaleString() : '-';
-                              }
-                              return incident.endTime ? new Date(incident.endTime).toLocaleString() : '-';
-                            })()}</span>
-                            <span>Duration: {(() => {
-                              let start = incident.startTime ? new Date(incident.startTime) : null;
-                              let end = null;
-                              if (Array.isArray(incident.timelines) && incident.timelines.length > 0) {
-                                const last = incident.timelines[incident.timelines.length - 1];
-                                end = last.time ? new Date(last.time) : null;
-                              } else if (incident.endTime) {
-                                end = new Date(incident.endTime);
-                              }
-                              if (start && end) {
-                                const diff = Math.round((end.getTime() - start.getTime()) / 60000);
-                                return diff > 0 ? diff + ' menit' : '0 menit';
-                              }
-                              return '-';
-                            })()}</span>
+                            <span>Resolved: {resolvedTime}</span>
+                            <span>Duration: {duration}</span>
                           </div>
                           <div className="mb-3 sm:mb-2 text-gray-700 text-sm sm:text-base">{incident.solution || '-'}</div>
                           {timelineCount > 0 && (
                             <button
                               className="text-blue-600 text-sm font-medium underline mb-2"
-                              onClick={() => setExpandedTimeline(expandedTimeline === incident._id ? null : (incident._id || null))}
+                              onClick={() => setExpandedTimeline(expandedTimeline === (incident._id ?? incident.startTime) ? null : (incident._id ?? incident.startTime))}
                               type="button"
                             >
-                              {expandedTimeline === incident._id ? 'Hide Timeline' : `Show Timeline (${timelineCount} updates)`}
+                              {expandedTimeline === (incident._id ?? incident.startTime) ? 'Hide Timeline' : `Show Timeline (${timelineCount} updates)`}
                             </button>
                           )}
-                          {expandedTimeline === incident._id && (
+                          {expandedTimeline === (incident._id ?? incident.startTime) && (
                             <div className="space-y-4 mt-2">
                               {incident.timelines?.map((tl, idx) => (
                                 <div key={idx} className="bg-gray-50 rounded-lg border border-gray-200 p-4">
@@ -247,7 +237,7 @@ const IncidentHistory: React.FC<IncidentHistoryProps> = ({ showAddButton, showTi
                                 Edit
                               </button>
                               <button
-                                onClick={() => handleDeleteIncident(incident._id!)}
+                                onClick={() => handleDeleteIncident(incident._id ?? incident.startTime)}
                                 className="flex items-center justify-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium"
                               >
                                 <Trash2 className="w-4 h-4" />

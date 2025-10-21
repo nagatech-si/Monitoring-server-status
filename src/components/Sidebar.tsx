@@ -1,12 +1,10 @@
-import {Server as ServerIcon, Folder, FolderOpen, LayoutDashboard, Users, ListOrdered, History, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Users, ListOrdered, History, ChevronLeft } from 'lucide-react';
 import { AlertCircle } from 'lucide-react';
 import { Dispatch, SetStateAction } from 'react';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddGroup: () => void;
-  onAddServer: () => void;
   activeMenu: 'dashboard' | 'group' | 'server' | 'history' | 'report';
   setActiveMenu: Dispatch<SetStateAction<'dashboard' | 'group' | 'server' | 'history' | 'report'>>;
 }
@@ -14,8 +12,6 @@ interface SidebarProps {
 export default function Sidebar({ 
   isOpen, 
   onClose, 
-  onAddGroup, 
-  onAddServer, 
   activeMenu, 
   setActiveMenu 
 }: SidebarProps) {
